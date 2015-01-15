@@ -1,0 +1,65 @@
+# R code for simple map of poverty rates by state.
+#
+# Jerzy Wieczorek, May 21, 2012
+# @civilstat
+# http://civilstat.com
+
+# Read dataset
+setwd('C:/Users/BScheich/Desktop')
+povdata <- read.csv("statepovdata.csv")
+
+# Load maps library and state dataset
+library(maps)
+data(state, package = "datasets")
+
+# Add DC to default list of state names,
+# since we have data for it and it'll make the mapping easier
+state.name.aug <- c(state.name,"District of Columbia")
+state.abb.aug <- c(state.abb,"DC")
+
+# Figure out which areas on map correspond to which states
+state.to.map <- match.map("state", state.name.aug)
+
+# Use basic colors
+# (not run)
+#col.bg <- "darkgrey"
+#mycolpal <- c("white","lightblue1","lightblue4","blue1","blue4")
+#nrcols <- length(mycolpal)
+#col.text <- "black"
+
+# Use nicer colors with RColorBrewer package
+# (run instead of basic colors above)
+library(RColorBrewer)
+nrcols <- 5
+mycolpal <- brewer.pal(nrcols,"Blues")
+col.bg <- brewer.pal(3,"Greys")[1]
+col.text <- "black"
+
+
+# Assign a color class to each state
+# Need to account for match.map!
+options(stringsAsFactors = FALSE)
+plotcolstemp <- data.frame(abb=povdata[,1],
+                           col=mycolpal[cut(povdata[,3],nrcols,labels=F)])
+stateabbs <- data.frame(abb=state.abb.aug[state.to.map])
+plotcols <- merge(stateabbs,plotcolstemp,sort=F)
+
+# Set xpd=TRUE to allow writing/plotting outside margins
+par(xpd=TRUE)
+
+# Plot the map itself
+map("state",col=plotcols,fill=T,bg=col.bg, resolution=0, proj="polyconic")
+
+# Annotate with title and source info
+title(main="US states: % in poverty (all ages)", col.main=col.text)
+title(sub="Source: U.S. Census Bureau,\n",line=3.5,col.sub=col.text,font.sub=2)
+title(sub="Small Area Income & Poverty Estimates, 2009",line=3.5,col.sub=col.text,font.sub=2)
+
+# Basic legend from graphics package
+# (not run)
+#legend(x="bottom",legend=c(min(povdata[,3]),"","","",max(povdata[,3])),fill=mycolpal,horiz=T)
+
+# Nicer legend using plotrix package
+# (run instead of basic legend above)
+library(plotrix)
+color.legend(-.2,.35,.2,.4,legend=c("8.6%","21.8%"),align="rb",rect.col=mycolpal,col=col.text)
