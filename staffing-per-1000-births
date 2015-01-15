@@ -1,0 +1,13 @@
+library(reshape)
+library(ggplot2)
+setwd("C:/Users/bscheich/Desktop/Data Collaborative Data")
+data<-read.csv("Data_Collab_Boxplot_Data_2012.csv", header=TRUE)
+data[data==0] <- NA
+data1<-melt(data,id=c("number","category"),na.rm=TRUE)
+RNFTE1000<-cast(data1,number~category,subset=variable=="RN_FTE_1000")
+ggplot(data, aes(x=category, y=RN_FTE_1000, fill=category)) +scale_fill_discrete(name="Category",breaks=c("A", "B", "C","D","E"),labels=c("A: less than 1000 births", "B: 1000-1999 births", "C: 2000-2999 births","D: 3000-3999 births","E: 4000+ births"))+ geom_boxplot()+labs(x="annual delivery category", y="RN FTEs per 1000 births")+ggtitle("RNs per 1000 births by Annual Delivery Category")+theme(plot.title = element_text(lineheight=.8, face="bold"))+theme(legend.text = element_text(colour="black", size = 8))
+ggsave("RNs_1000_births.pdf",dpi=300)
+ggplot(data, aes(x=category, y=Per_Staff_RN_FTES, fill=category)) +scale_fill_discrete(name="Category",breaks=c("A", "B", "C","D","E"),labels=c("A", "B", "C","D: ","E"))+ylim(0,125)+ geom_boxplot()+labs(x="annual delivery category", y="RN FTEs per 1000 births")+ggtitle("Perinatal Staff RNs per 1000 births by Annual Delivery Category")+theme(plot.title = element_text(lineheight=.8, face="bold"))+theme(legend.text = element_text(colour="black", size = 8))
+ggsave("Perinatal_Staff_RNs_1000_births.pdf",dpi=300)
+asumggplot(data, aes(x=category, y=Tot_RN_FTE,fill=category)) +scale_fill_discrete(name="Category",breaks=c("A", "B", "C","D","E"),labels=c("A: less than 1000 births", "B: 1000-1999 births", "C: 2000-2999 births","D: 3000-3999 births","E: 4000+ births"))+ geom_boxplot()+labs(x="annual delivery category", y="RN FTEs per 1000 births")+ggtitle("Neonatal Staff RNs per 1000 births by Annual Delivery Category")+theme(plot.title = element_text(lineheight=.8, face="bold"))+theme(legend.text = element_text(colour="black", size = 8))
+ggsave("Neonatal_Staff_RNs_1000_births.pdf",dpi=300)
