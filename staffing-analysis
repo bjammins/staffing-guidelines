@@ -1,0 +1,663 @@
+library(reshape)
+library(ggplot2)
+library(plyr)
+setwd("L:/Staffing Guidelines Implementation/Gap Analysis Product/R Code")
+data_sect1<-read.csv("Report_Fall_2012_Ben_section_1.csv", header=TRUE)
+data_sect2<-read.csv("Report_Fall_2012_Ben_section_2.csv", header=TRUE)
+data_sect3<-read.csv("Report_Fall_2012_Ben_section_3.csv", header=TRUE)
+#nat_data<-read.csv("national_birth_data_numbers.csv",header=TRUE)
+
+
+levels(data_sect1$CATEGORY)<-c("<1000 deliveries","1000-1999 del","2000-2999 del","3000-3999 del","4000+ deliveries")
+
+#levels(data_sect1$X1)<-c("Not Magnet","No Response","Magnet")
+
+data<-merge(data_sect1,data_sect2, by="HospitalReferenceNumber") #merge the data
+data_all<-merge(data,data_sect3,by="HospitalReferenceNumber")  #merge the data
+levels(data_all$Session)<-c("2011-1","2011-2","2012","2011") #set up the factor levels
+data_all$Session[data_all$Session=="2011-1"]<-"2011" #Make 2011-1 appear as 2011
+data_all$Session[data_all$Session=="2011-2"]<-"2011"
+data_all$Session<-factor(data_all$Session,c("2011","2012")) #Factor so 2011 appears before 2012
+#data_all$RNFTEs<-apply(na.omit(c(data_all$X52.1b,data_all$X52.1c, data_all$X52.2b, data_all$X52.2c, data_all$X52.3b, data_all$X52.3c,data_all$X52.4b, data_all$X52.4c,data_all$X52.5b, data_all$X52.5c,data_all$X52.6b, data_all$X52.6c, data_all$X52.7a.b, data_all$X52.7a.c, data_all$X52.7b.b, data_all$X52.7b.c,data_all$X52.8b, data_all$X52.8c, data_all$X52.9b, data_all$X52.9c, data_all$X52.10b, data_all$X52.10c, data_all$X52.11b, data_all$X52.11c, data_all$X52.12b, data_all$X52.12c, data_all$X52.13b, data_all$X52.3c, data_all$X52.14a.b, data_all$X52.14a.c)),1,sum)
+
+#mdf<-melt(data_all,id=c("HospitalReferenceNumber","Session"))
+#data_all$X59<-data_all
+
+mdf<-melt(data_all,id=c("HospitalReferenceNumber", "CATEGORY"))
+
+levels(data_all$CATEGORY)<-c("<1000 deliveries","1000-1999 del","2000-2999 del","3000-3999 del","4000+ deliveries")
+
+#national data
+
+#nat_data<-as.data.frame(nat_data)
+
+
+#Histograms on Separate Graphs next to each other of annual deliveries
+ggplot(data_all, aes(x=X16)) + geom_histogram(binwidth=500, colour="black", fill="white") + 
+  facet_grid(.~Session)+labs(title="Data Collaborative Members by Data Submission Session")+xlab("Annual Deliveries") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+ggplot(data_all, aes(x = X83Rec)) + geom_bar(aes(fill = variable), position = 'fill')
+#Distributions of LDR/LDRP/etc
+ggplot(data_all, aes(x=X3)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(Session ~ .)+labs(title="Data Collaborative Members by \nData Submission Session & \n Labor Unit Configuration")+xlab("Labor Unit Configuration") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+ggsave("meb lab config.png",dpi=300)
+#Distributions of LDR/LDRP etc by Category
+ggplot(data_all, aes(x=X3)) + geom_histogram(binwidth=500, colour="black", fill="white") + 
+  facet_grid(CATEGORY ~ .)+labs(title="Data Collaborative Members by Labor Unit Configuration")+xlab("Category") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+ggsave("dat collab by labor unit config.png", dpi=500)
+#Distribtuions by NICU Category
+ggplot(data_all, aes(x=X4)) + geom_histogram(binwidth=500, colour="black", fill="white") + 
+  facet_grid(CATEGORY ~ .)+labs(title="Data Collaborative Members by NICU Category")+xlab("Category") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+ggsave("dat collb by NICU cat.png", dpi=500)
+#Histograms on Separate Graphs next to each other of magnet by delivery category
+ggplot(data_all, aes(x=X1)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(CATEGORY ~.)+labs(title="Data Collaborative Members by Data Submission Session")+xlab("Annual Deliveries") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+#Antepartum Graphs meeting AWHONN Guidelines
+Antlvls<-c("NST","Init Triage","Triage","AP Comp-stable","AP Comp-unstable","MgSO4 1st hr","MgSO4 mat","Cerv Ripen")
+
+antesub<-mdf[mdf$variable %in% c("X58Rec","X59Rec","X60Rec","X61Rec","X62Rec","X63Rec","X64Rec","X65Rec"),]
+
+antesub$value<-factor(antesub$value) #make it a factor
+antesub$variable<-factor(antesub$variable) #make it a factor
+levels(antesub$variable)<-c("NST","InitTriage","Triage","Comp-stbl","Comp-unst","MgSO4 1 hr","MgSO4 mat","Cerv Ripen")
+levels(antesub$value)<-c("No","No Response","Not Applicable","Yes")
+anteply.den<-ddply(antesub,.(variable,Session),summarize,den.count=length(HospitalReferenceNumber)) #calculate denominator
+
+antesubply<-ddply(antesub,.(variable,Session,value),summarize,val.count=length(HospitalReferenceNumber)) #calculate numerator
+
+plydata<-merge(antesubply,anteply.den,all.x=TRUE)
+
+pct<-plydata$val.count/plydata$den.count
+plydata<-cbind(plydata,pct)
+plydata$Session<-factor(plydata$Session,c("2011","2012")) #Factor and set the order
+plydata$value<-factor(plydata$value,c("Yes","No","Not Applicable","No Response"))
+
+
+
+ggplot(plydata, aes(x = Session,y=pct,fill=value))+
+  geom_bar()+geom_text(aes(label=signif(pct,2)),size=4)+
+  facet_grid(.~variable)+scale_fill_brewer(palette="Set3")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Antepartum RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Year of Data Submission")+ylab("percent")+ylim(0,1)
+
+#2011 and 2012 combined Antepartum meeting the AWHONN Guidelines
+Antlvls<-c("NST","Init Triage","Triage","AP Comp-stable","AP Comp-unstable","MgSO4 1st hr","MgSO4 mat","Cerv Ripen")
+
+antesub<-mdf[mdf$variable %in% c("X58Rec","X59Rec","X60Rec","X61Rec","X62Rec","X63Rec","X64Rec","X65Rec"),]
+
+antesub$value<-factor(antesub$value) #make it a factor
+antesub$variable<-factor(antesub$variable) #make it a factor
+levels(antesub$variable)<-c("NST","InitTriage","Triage","Comp-stbl","Comp-unst","MgSO4 1 hr","MgSO4 mat","Cerv Ripen")
+levels(antesub$value)<-c("No","No Response","Not Applicable","Yes")
+anteply.den<-ddply(antesub,.(variable),summarize,den.count=length(HospitalReferenceNumber)) #calculate denominator
+
+antesubply<-ddply(antesub,.(variable,value),summarize,val.count=length(HospitalReferenceNumber)) #calculate numerator
+
+plydata<-merge(antesubply,anteply.den,all.x=TRUE)
+
+pct<-plydata$val.count/plydata$den.count
+plydata<-cbind(plydata,pct)
+plydata$value<-factor(plydata$value,c("Yes","No","Not Applicable","No Response"))
+
+#Graph
+ggplot(plydata, aes(x = variable,y=pct,fill=value))+
+  geom_bar()+geom_text(aes(label=signif(pct,2)),size=4)+scale_fill_brewer(palette="Set3")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Antepartum RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Year of Data Submission")+ylab("percent")+ylim(0,1)
+
+
+ggsave("antepartum meeting guidelines.pdf",dpi=300)
+
+
+#Histogram of Initial Triage
+ggplot(data_all, aes(x=X59a)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  labs(title="RN to Woman Initial Triage Ratios")+xlab("Number of women to 1 RN") +ylab("Count")+theme(plot.title = element_text(size = rel(2)))
+ggsave("initial triage hist.png",dpi=400)
+#Histogram of initial triage faceted by year
+ggplot(data_all, aes(x=X59a)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(.~Session)+labs(title="RN to Woman Initial Triage Ratios")+xlab("Number of women to 1 RN") +ylab("Count")+theme(plot.title = element_text(size = rel(2)))
+ggsave("init triage hist faceted.png", dpi=400)
+
+
+#Initial Triage by category
+
+
+cast(mdf, subset=variable=="X16",CATEGORY+value~value, length)
+
+#Who are these hospitals who aren't getting 1:1 for Initial Triage?
+summary(glm(X59Rec~X58Rec+X60Rec+X61Rec+X62Rec+X63Rec+X64Rec+X65Rec+X68Rec+X69Rec+X70Rec+X71Rec+X72Rec+X73Rec+X74Rec+X75Rec+X76Rec+X77Rec+X80Rec+X81Rec+X82Rec+X83Rec+X84Rec+X85Rec+X86Rec+X87Rec+X88Rec,data=data_all, family=binomial("logit")))
+
+data_init_triage<-data_all[data_all$X59a==1,]
+
+summary(data_init_triage)
+
+
+ggplot(data_all, aes(x=X4)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(X69a~X59a)+labs(title="RN to Woman Initial Triage Ratios")+xlab("Number of women to 1 RN") +ylab("Count")+theme(plot.title = element_text(size = rel(2)))
+
+data_init_no<-data_all[data_all$X59a>1,]#subset hospitals that did not get initial triage 1 RN : 1 woman
+data_init_yes<-data_all[data_all$X59a==1,]#Subset hospitals that did get initial triage
+ggplot(data_init_yes, aes(x=X1)) + geom_histogram(binwidth=1, colour="black", fill="white")
+  
+
+ggplot(plydata[plydata$value=="Yes",],aes(x=Session,y=pct,group=variable))+
+  geom_line(size=2,aes(colour=variable, lty=variable))+scale_color_brewer(palette="Set1")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Antepartum RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Year of Data Submission")+ylab("Percent Meeting AWHONN Guidelines")+ylim(0,1)#+facet_grid(.~variable)
+
+#Intrapartum Graphs meeting AWHONN Guidelines 2011 vs 2012
+intrasub<-mdf[mdf$variable %in% c("X68Rec","X69Rec","X70Rec","X71Rec","X72Rec","X73Rec","X74Rec","X75Rec","X76Rec","X77Rec"),]
+
+intrasub$value<-factor(intrasub$value) #make it a factor
+intrasub$variable<-factor(intrasub$variable) #make it a factor
+levels(intrasub$variable)<-c("Comp","Oxytocin","No Pain","Ausc \nProt","MgSO4 \n lab","Reg Anes","2nd Stage","Lab\n No Cmp","Vag \n Birth","CS \n Birth")
+levels(intrasub$value)<-c("No","No Response","Not Applicable","Yes")
+intraply.den<-ddply(intrasub,.(variable,Session),summarize,den.count=length(HospitalReferenceNumber)) #calculate denominator
+
+intrasubply<-ddply(intrasub,.(variable,Session,value),summarize,val.count=length(HospitalReferenceNumber)) #calculate numerator
+
+plydata<-merge(intrasubply,intraply.den,all.x=TRUE)
+
+pct<-plydata$val.count/plydata$den.count
+plydata<-cbind(plydata,pct)
+plydata$Session<-factor(plydata$Session,c("2011","2012")) #Factor and set the order
+plydata$value<-factor(plydata$value,c("Yes","No","Not Applicable","No Response"))
+
+ggplot(plydata, aes(x = Session,y=pct,fill=value))+
+  geom_bar()+geom_text(aes(label=signif(pct,2)),size=4)+
+  facet_grid(.~variable)+scale_fill_brewer(palette="Set3")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Intrapartum RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Year of Data Submission")+ylab("percent")+ylim(0,1)
+
+#Intrapartum meeting staffing Guidelines
+intrasub<-mdf[mdf$variable %in% c("X68Rec","X69Rec","X70Rec","X71Rec","X72Rec","X73Rec","X74Rec","X75Rec","X76Rec","X77Rec"),]
+
+intrasub$value<-factor(intrasub$value) #make it a factor
+intrasub$variable<-factor(intrasub$variable) #make it a factor
+levels(intrasub$variable)<-c("Comp","Oxytocin","No Pain","Ausc \nProt","MgSO4 \n lab","Reg \nAnes","2nd Stage","Lab\n No Cmp","Vag \n Birth","CS \n Birth")
+levels(intrasub$value)<-c("No","No Response","Not Applicable","Yes")
+intraply.den<-ddply(intrasub,.(variable),summarize,den.count=length(HospitalReferenceNumber)) #calculate denominator
+
+intrasubply<-ddply(intrasub,.(variable,value),summarize,val.count=length(HospitalReferenceNumber)) #calculate numerator
+
+plydata<-merge(intrasubply,intraply.den,all.x=TRUE)
+
+pct<-plydata$val.count/plydata$den.count
+plydata<-cbind(plydata,pct)
+plydata$value<-factor(plydata$value,c("Yes","No","Not Applicable","No Response"))
+
+ggplot(plydata, aes(x = variable,y=pct,fill=value))+
+  geom_bar()+geom_text(aes(label=signif(pct,2)),size=4)+scale_fill_brewer(palette="Set3")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Intrapartum RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Intrapartum Category")+ylab("percent")+ylim(0,1)
+ggsave("intrapartum meeting staffing guidelines.pdf",dpi=300)
+
+
+#Postpartum Meeting AWHONN Guidelines 2011 vs 2012
+
+ppsub<-mdf[mdf$variable %in% c("X80Rec","X81Rec","X82Rec","X83Rec","X84Rec","X85Rec","X86Rec","X87Rec","X88Rec","X89Rec"),]
+
+ppsub$value<-factor(ppsub$value) #make it a factor
+ppsub$variable<-factor(ppsub$variable) #make it a factor
+levels(ppsub$variable)<-c("PA \n Care","2hr rec","MgSO4\n PP","PP \n wo comp","PP \n w cmp stbl","Hlthy Nwb","Cont care","Intermediate\n care","Intensive\n care","Comp cc")
+levels(ppsub$value)<-c("No","No Response","Not Applicable","Yes")
+ppply.den<-ddply(ppsub,.(variable,Session),summarize,den.count=length(HospitalReferenceNumber)) #calculate denominator
+
+ppsubply<-ddply(ppsub,.(variable,Session,value),summarize,val.count=length(HospitalReferenceNumber)) #calculate numerator
+
+plydata<-merge(ppsubply,ppply.den,all.x=TRUE)
+
+pct<-plydata$val.count/plydata$den.count
+plydata<-cbind(plydata,pct)
+plydata$Session<-factor(plydata$Session,c("2011","2012")) #Factor and set the order
+plydata$value<-factor(plydata$value,c("Yes","No","Not Applicable","No Response"))
+
+# 2011 vs 2012
+ggplot(plydata, aes(x = Session,y=pct,fill=value))+
+  geom_bar()+geom_text(aes(label=signif(pct,2)),size=4)+
+  facet_grid(.~variable)+scale_fill_brewer(palette="Set3")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Postpartum/Newborn Nursery RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Year of Data Submission")+ylab("percent")+ylim(0,1)
+
+#PP meeting the staffing guidelines
+ppsub<-mdf[mdf$variable %in% c("X80Rec","X81Rec","X82Rec","X83Rec","X84Rec","X85Rec","X86Rec","X87Rec","X88Rec","X89Rec"),]
+
+ppsub$value<-factor(ppsub$value) #make it a factor
+ppsub$variable<-factor(ppsub$variable) #make it a factor
+levels(ppsub$variable)<-c("PA \n Care","2hr rec","MgSO4\n PP","PP \n wo comp","PP \n w cmp stbl","Hlthy Nwb","Cont care","Intermediate\n care","Intensive\n care","Comp cc")
+levels(ppsub$value)<-c("No","No Response","Not Applicable","Yes")
+ppply.den<-ddply(ppsub,.(variable),summarize,den.count=length(HospitalReferenceNumber)) #calculate denominator
+
+ppsubply<-ddply(ppsub,.(variable,value),summarize,val.count=length(HospitalReferenceNumber)) #calculate numerator
+
+plydata<-merge(ppsubply,ppply.den,all.x=TRUE)
+
+pct<-plydata$val.count/plydata$den.count
+plydata<-cbind(plydata,pct)
+plydata$value<-factor(plydata$value,c("Yes","No","Not Applicable","No Response"))
+
+# Graph
+ggplot(plydata, aes(x = variable,y=pct,fill=value))+
+  geom_bar()+geom_text(aes(label=signif(pct,2)),size=4)+scale_fill_brewer(palette="Set3")+
+  opts(title='Is Your Hospital Meeting the AWHONN Guideline \n for Postpartum/Newborn Nursery RN Staffing?', plot.title=theme_text(colour = 'black', size = 22,face = 'bold'))+xlab("Postpartum Category")+ylab("percent")+ylim(0,1)
+ggsave("Postpartum meeting the staffing guidelines.pdf", dpi=300)
+
+#boxplot of orientation hours
+mdf_box<-melt(data_all,id=c("HospitalReferenceNumber"), na.rm=TRUE)
+
+box<-mdf_box[mdf_box$variable %in% c("X117a","X117b","X117c"),]
+box$variable<-factor(box$variable)
+box$value<-as.numeric(box$value)
+levels(box$variable)<-c("New RN","Experienced RN/New to OB","Experienced RN/Experienced to OB")
+cast(box, variable~., summary) #summary of orientation hour data
+
+box_new_RN <- box[box$variable=="New RN",]
+qqnorm(box_new_RN$value)
+qqline(box_new_RN$value)
+shapiro.test(box_new_RN$value) #null hypothesis is that they are normally distributed
+
+
+box_exp_RN_new_OB<-diam <- box[box$variable=="Experienced RN/New to OB",]
+qqnorm(box_exp_RN_new_OB$value)
+qqline(box_exp_RN_new_OB$value)
+shapiro.test(box_exp_RN_new_OB$value) #null hypothesis is that they are normally distributed
+
+
+wilcox.test(box_new_RN$value,box_exp_RN_new_OB$value) # for non-normally distributed data
+#t.test(box_new_RN$value,box_exp_RN_new_OB$value) #for normally distributed data
+# the box_new_RN is not normally distributed but the box_exp_RN_new_OB is normally distributed
+#hence I will use the wilcoxen rank sum test
+
+
+
+ggplot(box, aes(x=variable, y=value))+geom_boxplot()+xlab("Nursing Experience")+ylab("Total Orientation Hours")+ggtitle("Orientation Hours by Nursing Experience")
+ggsave("box Orient hours.pdf", dpi=300)
+
+ggplot(box,aes(x=variable,y=value))+geo_histogram(binwidth=50)+
+ggplot(data_all, aes(x=CATEGORY, y=X117b))+geom_boxplot()
+ggplot(data_all, aes(x=CATEGORY, y=X117c))+geom_boxplot()
+
+# Demographic Analysis
+#Histogram of hospitals by deliver category
+ggplot(data_all, aes(x = CATEGORY, fill = X1))+geom_bar()+xlab("Delivery Category")+ylab("Count")+ggtitle("AWHONN Perinatal Staffing Data Collaborative \nNumber of Hospitals by Delivery Category and Magnet Status")+labs(fill="Magnet Status")
+ggsave("hosp by del cat.pdf",dpi=300)
+ggplot(nat_data,aes(x=Del.Category,fill=Category))+geom_bar()+xlab("Delivery Category")+ylab("Count")+ggtitle("Number of US Hospitals by Delivery Category")
+ggsave("nat_hosp_data.pdf",dpi=300)
+ggplot(data_all,aes(x=X16))+geom_histogram(binwidth=300,colour='black',fill='white')+geom_vline(aes(xintercept=mean(X16, na.rm=T)),color="red", linetype="dashed", size=1)+geom_vline(aes(xintercept=median(X16, na.rm=T)),color="blue", linetype="dashed", size=1)+xlab("Annual Deliveries")+ylab("Number of Hospitals")+ggtitle("Perinatal Staffing Data Collaborative Hospitals by Number of Annual Deliveries")
+ggsave("hosp by ann del.png", dpi=500)
+
+##### Triage Productivity#######
+mdf<-melt(data_all,id=c("HospitalReferenceNumber"))
+ptriage.prod<-mdf[mdf$variable %in% c("X121","X122","X123","X124","X125"),]
+ptriage.prod$value<-as.factor(ptriage.prod$value)
+ptriage.prod$value[ptriage.prod$value=="no"]<-"No"
+ptriage.prod$value[ptriage.prod$value==""]<-"NA"
+ptriage.prod <- ptriage.prod[!is.na(ptriage.prod$value),] #remove null values
+ptriage.prod$variable<-factor(ptriage.prod$variable)
+levels(ptriage.prod$variable)<-c("# of triage\n visits?","Triage \nLOS?","# of \nAP \ntests?","LOS for women\nundergoing \nAP testing?","Triage \nAcutity \nScale?")
+
+
+ggplot(ptriage.prod, aes(x = variable, fill = value))+geom_bar()+xlab("triage question")+ylab("Count")+ggtitle("How does your hospital measure \ntriage productivity?")+labs(fill="Answer to Question")+scale_fill_brewer(palette="Set3")+theme(plot.title = element_text(size = rel(2)))
+ggsave("triage prod.png",dpi=300)
+
+
+##### IP Productivity#######
+mdf<-melt(data_all,id=c("HospitalReferenceNumber"))
+ip.prod<-mdf[mdf$variable %in% c("X126","X142","X127","X128"),]
+ip.prod$value<-as.factor(ip.prod$value)
+ip.prod$value[ip.prod$value=="no"]<-"No"
+ip.prod$value[ip.prod$value=="yes"]<-"Yes" # make so all values are Yes
+ip.prod$value[ip.prod$value==""]<-"NA"
+ip.prod <- ip.prod[!is.na(ip.prod$value),] #remove null values
+ip.prod$variable<-factor(ip.prod$variable)
+levels(ip.prod$variable)<-c("Midnight census?","IP LOS?","IP Acutity Scale?","More than \nmidnight census?")
+
+
+ggplot(ip.prod, aes(x = variable, fill = value))+geom_bar()+xlab("IP Question")+ylab("Count")+ggtitle("How does your hospital measure \nintrapartum productivity?")+labs(fill="Answer to Question")+scale_fill_brewer(palette="Set3")+theme(plot.title = element_text(size = rel(2)))
+ggsave("IP prod.png",dpi=300)
+
+##### PP Productivity#######
+mdf<-melt(data_all,id=c("HospitalReferenceNumber"))
+pp.prod<-mdf[mdf$variable %in% c("X129","X130","X143","X131","X132"),]
+pp.prod$value<-as.factor(pp.prod$value)
+pp.prod$value[pp.prod$value=="no"]<-"No" # make it so all values are No
+pp.prod$value[pp.prod$value=="yes"]<-"Yes" # make so all values are Yes
+pp.prod$value[pp.prod$value==""]<-"NA"  # convert blanks to NAs
+pp.prod <- pp.prod[!is.na(pp.prod$value),] #remove null values
+pp.prod$variable<-factor(pp.prod$variable)  #make these a factor
+levels(pp.prod$variable)<-c("# of Del?","Midnight census\nmothers and \nbabies?","PP LOS?","PP \nAcutity \nScale?", "More often\nmidnight census\nmothers and babies?")
+
+
+ggplot(pp.prod, aes(x = variable, fill = value))+geom_bar()+xlab("PP Question")+ylab("Count")+ggtitle("How does your hospital \nmeasure postpartum productivity?")+labs(fill="Answer to Question")+scale_fill_brewer(palette="Set3")+theme(plot.title = element_text(size = rel(2)))
+ggsave("PP prod.png",dpi=300)
+
+##### More than midnight census Productivity#######
+mdf<-melt(data_all,id=c("HospitalReferenceNumber"))
+mid.prod<-mdf[mdf$variable %in% c("X142a","X143a"),]
+mid.prod$value<-as.factor(mid.prod$value)
+mid.prod$value[mid.prod$value==""]<-"NA"
+mid.prod <- mid.prod[!is.na(mid.prod$value),] #remove null values
+mid.prod <- mid.prod[mid.prod$value!="No Response",] #remove null values
+mid.prod$value<-factor(mid.prod$value,c("2","4","6","8","12","24","Other"))
+mid.prod$variable<-factor(mid.prod$variable)
+levels(mid.prod$variable)<-c("IP Census","PP Census")
+
+
+ggplot(mid.prod, aes(x = variable, fill = value))+geom_bar()+xlab("Question")+ylab("Count")+ggtitle("If you track more\n than midnight census\nhow often do you track it?")+labs(fill="Answer to Question (in hours)")+scale_fill_brewer(palette="Set3")+theme(plot.title = element_text(size = rel(2)))
+ggsave("mid prod.png",dpi=300)
+
+###### Charge Nurse Information###########
+mdf<-melt(data_all,id=c("HospitalReferenceNumber"))
+cn<-mdf[mdf$variable %in% c("X133","X134","X135","X136","X137","X138"),]
+cn$value<-as.factor(cn$value)
+cn$value[cn$value=="no"]<-"No" # make it so all values are No
+cn$value[cn$value=="yes"]<-"Yes" # make so all values are Yes
+cn$value[cn$value==""]<-"NA"  # convert blanks to NAs
+cn <- cn[!is.na(cn$value),] #remove null values
+cn$variable<-factor(cn$variable)  #make these a factor
+levels(cn$variable)<-c("IP \npat \nassig?","IP dir\ncare hrs?","PP \npat \nassig?","PP dir\ncare hrs?", "NICU \npat \nassig?","NICU dir\ncare hrs?")
+
+
+ggplot(cn, aes(x = variable, fill = value))+geom_bar()+xlab("Charge Nurse Question")+ylab("Count")+ggtitle("Charge Nurse Questions")+labs(fill="Answer to Question")+scale_fill_brewer(palette="Set3")+theme(plot.title = element_text(size = rel(2)))
+ggsave("charge prod.png",dpi=300)
+
+# Vaginal PP LOS rates
+ggplot(data_all, aes(x=X39)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  labs(title="Most frequently occurring \n length of postpartum stay for\n women who gave birth vaginally")+xlab("Category") +ylab("Count")+theme(plot.title = element_text(size = rel(2)))+facet_grid(CATEGORY ~ .)
+ggsave("PP Stay.pdf",dpi=400)
+
+# Ces PP LOS rates
+data_all$X40<-factor(data_all$X40,c("2 days (discharge on 2nd postpartum day)","3 days (discharge on 3rd postpartum day)","4 days (discharge on 4th postpartum day)",">4 days (discharge after 4th postpartum day)","No Response"))#factor and set order
+
+ggplot(data_all, aes(x=X40)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  labs(title="Most frequently occurring \n length of postpartum stay for\n women who gave birth via cesarean")+xlab("Category") +ylab("Count")+theme(plot.title = element_text(size = rel(2)))+facet_grid(CATEGORY ~ .)
+ggsave("PP Stay ces.pdf",dpi=400)
+
+#Minimum GA
+data_all$X139[data_all$X139==""]<-"NA"
+data_all_notna<- data_all[!is.na(data_all$X139),] #remove null values
+ggplot(data_all_notna, aes(x=X139)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  labs(title="Minimum Gestational Age \nfor people triaged in \nthe L&D triage unit")+xlab("Gestational Age in weeks") +ylab("Count")+theme(plot.title = element_text(size = rel(2)))+facet_grid(CATEGORY ~ .)
+ggsave("Min gest age.png",dpi=400)
+
+# Calculating rates
+mgso4_data<-ddply(data_all,.(CATEGORY,X33,X23),summarize,mgso4.rate=(X33)/X23) 
+mgso4_data<-mgso4_data[!is.na(mgso4_data$mgso4.rate),]
+oxy_ind<-ddply(data_all,.(CATEGORY,X30,X23),summarize,oxy_ind.rate=(X30/X23))
+oxy_aug<-ddply(data_all,.(CATEGORY,X31,X23),summarize,oxy_aug.rate=(X31/X23))
+ces_data<-ddply(data_all,.(CATEGORY,X21,X22,X23),summarize,ces_rate=(X21+X22)/X23)
+
+ggplot(mgso4_data, aes(x=CATEGORY, y=mgso4.rate))+geom_boxplot()+xlab("Delivery Category")+ylab("%")+ylim(0,1)+ggtitle("% of total births receiving MgSO4 \n via any route")+theme(plot.title = element_text(size = rel(2)))
+ggsave("mgso4.pdf",dpi=300)
+ggplot(oxy_ind, aes(x=CATEGORY, y=oxy_ind.rate))+geom_boxplot()+xlab("Delivery Category")+ylab("%")+ylim(0,1)+ggtitle("% of total births receiving oxytocin \n for inductions")+theme(plot.title = element_text(size = rel(2)))
+ggsave("oxy_ind.pdf",dpi=300)
+ggplot(oxy_aug, aes(x=CATEGORY, y=oxy_aug.rate))+geom_boxplot()+xlab("Delivery Category")+ylab("%")+ylim(0,1)+ggtitle("% of total births receiving oxytocin \n for augmentations")+theme(plot.title = element_text(size = rel(2)))
+ggsave("oxy_aug.pdf",dpi=300)
+ggplot(ces_data, aes(x=CATEGORY, y=ces_rate))+geom_boxplot()+xlab("Delivery Category")+ylab("%")+ylim(0,1)+ggtitle("% of total births delivered by \n cesarean section")+theme(plot.title = element_text(size = rel(2)))
+ggsave("ces_data.pdf",dpi=300)
+
+#BSN vs Non-BSN
+data_2012<-data_all[data_all$Session=="2012",]#only 2012 in the calculation
+data_2012<-data_2012[data_2012$HospitalReferenceNumber!="3GHTAUCA",] #removed from BSN analysis as they had headcount data but no FTE data
+data_2012<-data_2012[data_2012$HospitalReferenceNumber!="5QAZR318",]#removed from BSN analysis as they had headcount data but no FTE data
+data_2012<-data_2012[data_2012$HospitalReferenceNumber!="XK8T6KKC",]#removed from BSN analysis as they had headcount data but no FTE data
+
+BSN_avg<-ddply(data_2012,.(CATEGORY),summarize,rate=(X52c/(X52b+X52c)))#by delivery volumes
+
+BSN<-ddply(data_2012,.(CATEGORY),summarize,rate=(X52c/(X52b+X52c)))#BSN ratio by delivery volumes
+BSN<-BSN[!is.na(BSN$rate),]
+
+
+BSN_summary<-cast(BSN, CATEGORY~., summary) #summary of BSN rates
+write.csv(BSN_summary, file="BSN_summary.csv")
+
+
+cast(BSN_avg, variable~., summary) #summary of orientation hour data
+
+BSN_A<- BSN_avg[BSN_avg$CATEGORY=="A",]
+BSN_B<- BSN_avg[BSN_avg$CATEGORY=="B",]
+BSN_C<- BSN_avg[BSN_avg$CATEGORY=="C",]
+BSN_D<- BSN_avg[BSN_avg$CATEGORY=="D",]
+BSN_E<- BSN_avg[BSN_avg$CATEGORY=="E",]
+
+#Testing normality
+
+qqnorm(BSN_A$rate)
+qqline(BSN_A$rate)
+shapiro.test(BSN_A$rate) #null hypothesis is that they are normally distributed
+
+
+qqnorm(BSN_B$rate)
+qqline(BSN_B$rate)
+shapiro.test(BSN_B$rate) #null hypothesis is that they are normally distributed
+
+qqnorm(BSN_C$rate)
+qqline(BSN_C$rate)
+shapiro.test(BSN_C$rate) #null hypothesis is that they are normally distributed
+
+qqnorm(BSN_D$rate)
+qqline(BSN_D$rate)
+shapiro.test(BSN_D$rate) #null hypothesis is that they are normally distributed
+
+qqnorm(BSN_E$rate)
+qqline(BSN_E$rate)
+shapiro.test(BSN_E$rate) #null hypothesis is that they are normally distributed
+
+#wilcox.test(box_new_RN$value,box_exp_RN_new_OB$value) # for non-normally distributed data
+t.test(BSN_A$rate,BSN_B$rate) #for normally distributed data
+t.test(BSN_A$rate,BSN_C$rate) #for normally distributed data
+t.test(BSN_B$rate,BSN_C$rate)
+# the box_new_RN is not normally distributed but the box_exp_RN_new_OB is normally distributed
+#hence I will use the wilcoxen rank sum test
+
+
+
+
+
+
+
+
+
+
+
+
+ggplot(BSN,aes(x=CATEGORY, y=BSN.rate))+geom_boxplot()+xlab("Delivery Category")+ylab("%")+ylim(0,1)+ggtitle("% of total FTEs \nwith BSN or Higher")+theme(plot.title = element_text(size = rel(2)))
+ggsave("bsn_nonbsn.pdf",dpi=300)
+#By magnet vs not magnet
+BSN<-ddply(data_2012,.(CATEGORY,X1,X52b,X52c),summarize,BSN.rate=(X52c/(X52b+X52c)))#by delivery volumes
+BSN<-BSN[!is.na(BSN$BSN.rate),]
+ggplot(BSN,aes(x=X1, y=BSN.rate))+geom_boxplot()+xlab("Delivery Category")+ylab("%")+ylim(0,1)+ggtitle("% of total FTEs with BSN \nor Higher by Magnet Status")+theme(plot.title = element_text(size = rel(2)))
+ggsave("bsn_nonbsn_magnet.pdf",dpi=300)
+
+#Summary of meeting the Staffing guidelines
+mdf<-melt(data_all,id=c("HospitalReferenceNumber"))
+guide<-mdf[mdf$variable %in% c("X66","X78","X90","X92"),]
+guide$value<-as.factor(guide$value)
+guide$variable<-factor(guide$variable)  #make these a factor
+guide$value[guide$value=="yes"]<-"Yes" # make so all values are Yes
+levels(guide$variable)<-c("AP","IP","PP","Newborn\n Nurs/NICU")
+ggplot(guide, aes(x = variable, fill = value))+geom_bar()+xlab("Area")+ylab("Count")+labs(fill="Answer to Question")+scale_fill_brewer(palette="Set3")+theme(plot.title = element_text(size = rel(2)))
+ggsave("adjust_staffing.pdf", dpi=300)
+
+
+#Histograms on Separate Graphs next to each other of Guideline #59 Triage
+ggplot(data_all, aes(x=X59a)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(.~CATEGORY.y)+labs(title="Initial Triage")+xlab("Typical number of patients per 1 RN") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+
+
+
+#Histograms on Separate Graphs next to each other of Guideline #69 Oxytocin Administration
+ggplot(data_all, aes(x=X69a)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(.~CATEGORY.y)+labs(title="Oxytocin administration")+xlab("Typical number of patients per 1 RN") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+#Histograms on Separate Graphs next to each other of Guideline #70 No Pain relief or intervention
+ggplot(data_all, aes(x=X70a)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(.~CATEGORY.y)+labs(title="No Pain relief")+xlab("Typical number of patients per 1 RN") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+#Histograms on Separate Graphs next to each other of Guideline #80 PAC after Cesarean Birth
+ggplot(data_all, aes(x=X80)) + geom_histogram(binwidth=1, colour="black", fill="white") + 
+  facet_grid(.~CATEGORY.y)+labs(title="Post anesthesia care after cesarean birth")+xlab("Typical number of patients per 1 RN") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+
+
+#Summary of meeting vs. not meeting the Initial Triage Ratio
+ggplot(data_all, aes(x=X59Rec)) + geom_histogram(binwidth=500, colour="black", fill="white") + 
+  facet_grid(.~X1)+labs(title="Meeting Initial Triage AWHONN Guideline by Magnet Status")+xlab("Meeting AWHONN Guideline") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+ggplot(data_all, aes(x=X59Rec)) + geom_histogram(binwidth=500, colour="black", fill="white") + 
+  facet_grid(CATEGORY~.)+labs(title="Meeting Initial Triage AWHONN Guideline by Number of Annual Deliveries")+xlab("Meeting AWHONN Guideline") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+ggplot(data_all, aes(x=X59Rec)) + geom_histogram(binwidth=500, colour="black", fill="white") + 
+  facet_grid(X69Rec~.)+labs(title="Meeting Initial Triage AWHONN Guideline by Meeting the Oxytocin Guideline")+xlab("Meeting AWHONN Guideline") +ylab("Number of Hospitals")+theme(plot.title = element_text(size = rel(2)))
+
+
+#Create the boxplot RNs per 1000 deliveries
+setwd("C:/Users/bscheich/Desktop/Data Collaborative Data")
+data<-read.csv("Data_Collab_Boxplot_Data_2012.csv", header=TRUE)
+data[data==0] <- NA
+data1<-melt(data,id=c("number","category"),na.rm=TRUE)
+RNFTE1000<-cast(data1,number~category,subset=variable=="RN_FTE_1000")
+ggplot(data, aes(x=category, y=RN_FTE_1000, fill=category)) +scale_fill_discrete(name="Category",breaks=c("A", "B", "C","D","E"),labels=c("A: less than 1000 births", "B: 1000-1999 births", "C: 2000-2999 births","D: 3000-3999 births","E: 4000+ births"))+ geom_boxplot()+labs(x="annual delivery category", y="RN FTEs per 1000 births")+ggtitle("RNs per 1000 births by Annual Delivery Category")+theme(plot.title = element_text(lineheight=.8, face="bold"))+theme(legend.text = element_text(colour="black", size = 8))
+ggsave("RNs_1000_births.pdf",dpi=300)
+ggplot(data, aes(x=category, y=Per_Staff_RN_FTES, fill=category)) +scale_fill_discrete(name="Category",breaks=c("A", "B", "C","D","E"),labels=c("A", "B", "C","D: ","E"))+ylim(0,125)+ geom_boxplot()+labs(x="annual delivery category", y="RN FTEs per 1000 births")+ggtitle("Perinatal Staff RNs per 1000 births by Annual Delivery Category")+theme(plot.title = element_text(lineheight=.8, face="bold"))+theme(legend.text = element_text(colour="black", size = 8))
+ggsave("Perinatal_Staff_RNs_1000_births.pdf",dpi=300)
+asumggplot(data, aes(x=category, y=Tot_RN_FTE,fill=category)) +scale_fill_discrete(name="Category",breaks=c("A", "B", "C","D","E"),labels=c("A: less than 1000 births", "B: 1000-1999 births", "C: 2000-2999 births","D: 3000-3999 births","E: 4000+ births"))+ geom_boxplot()+labs(x="annual delivery category", y="RN FTEs per 1000 births")+ggtitle("Neonatal Staff RNs per 1000 births by Annual Delivery Category")+theme(plot.title = element_text(lineheight=.8, face="bold"))+theme(legend.text = element_text(colour="black", size = 8))
+ggsave("Neonatal_Staff_RNs_1000_births.pdf",dpi=300)
+
+#Graph RN FTEs (L&D, Antepartum, Postpartum vs. total number of births)
+#obtain subset of Perinatal Unit FTEs
+FTEs<-names(data_all) %in% c("X52.1b","X52.1c", "X52.2b", "X52.2c", "X52.3b", "X52.3c","X52.4b", "X52.4c","X52.5b", "X52.5c","X52.6b", "X52.6c", "X52.7a.b", "X52.7a.c", "X52.7b.b", "X52.7b.c")
+
+data_FTEs<-data.frame(data_all[,FTEs])# convert data frame to FTEs
+data_FTEs[is.na(data_FTEs)]<-0
+
+data_FTEs$sum<-apply(data_FTEs,1,sum) # sum across all FTE numbers
+data_births<-as.numeric(data_all$X16) #obtain the annual birth numbers
+
+data_FTEs<-cbind(data_all$HospitalReferenceNumber,data_all$CATEGORY, data_FTEs,data_births)
+
+
+data_FTEs<-data_FTEs[data_FTEs$sum>0,] #values where FTE sum is greater than 0
+
+data_FTEs$births_per_FTE<-data_FTEs$data_births/data_FTEs$sum
+
+data_FTEs<-rename(data_FTEs, c("data_all$CATEGORY"="CATEGORY", "data_all$HospitalReferenceNumber"="Refnumb"))
+#Obtain the data for an ANOVA of the births_per_FTE data
+
+
+FTE_1000 <- subset(data_FTEs,CATEGORY=="<1000 deliveries")
+qqnorm(FTE_1000$births_per_FTE)
+qqline(FTE_1000$births_per_FTE)
+shapiro.test(FTE_1000$births_per_FTE) #null hypothesis is that they are normally distributed
+
+FTE_1999 <- subset(data_FTEs,CATEGORY=="1000-1999 del")
+qqnorm(FTE_1999$births_per_FTE)
+qqline(FTE_1999$births_per_FTE)
+shapiro.test(FTE_1999$births_per_FTE) #null hypothesis is that they are normally distributed
+
+FTE_2999 <- subset(data_FTEs,CATEGORY=="2000-2999 del")
+qqnorm(FTE_2999$births_per_FTE)
+qqline(FTE_2999$births_per_FTE)
+shapiro.test(FTE_2999$births_per_FTE) #null hypothesis is that they are normally distributed
+
+FTE_3999 <- subset(data_FTEs,CATEGORY=="3000-3999 del")
+qqnorm(FTE_3999$births_per_FTE)
+qqline(FTE_3999$births_per_FTE)
+shapiro.test(FTE_3999$births_per_FTE) #null hypothesis is that they are normally distributed
+
+FTE_4000 <- subset(data_FTEs,CATEGORY=="4000+ deliveries")
+qqnorm(FTE_4000$births_per_FTE)
+qqline(FTE_4000$births_per_FTE)
+shapiro.test(FTE_4000$births_per_FTE) #null hypothesis is that they are normally distributed
+
+FTE_1999_2999<-subset(data_FTEs,CATEGORY==c("1000-1999 del","2000-2999 del")) #test whether the Births per FTE are different in the 1000-1999 than 2000-2999
+
+kruskal.test(births_per_FTE ~ CATEGORY, data = data_FTEs)
+
+
+
+#Test the loess changes in slope
+
+data_FTEs$loess_cat <- cut(data_FTEs$data_births,breaks=c(-Inf, 1700, 2500, Inf),labels=c("<1700","1700-2500",">2500"))
+data_FTEs$scode <- revalue(data$sex, c("M"="1", "F"="2"))
+
+kruskal.test(births_per_FTE ~ loess_cat, data=data_FTEs)
+
+#Perinatal FTEs vs Annual Deliveries
+ggplot(data_FTEs, aes(x=data_births, y=sum))+geom_point(shape=1)+geom_smooth()+xlab("Annual Deliveries")+ylab("Total FTEs for Perinatal Units (triage, inpatient AP, IP, PP, newborn nursery")+ggtitle("Perinatal FTEs vs. Annual Deliveries (n=62)")+theme(plot.title = element_text(size = rel(2)))+scale_x_continuous(breaks=c(500,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000))+scale_y_continuous(breaks=c(0,25,50,75,100,125,150,175,200))            # Add a loess smoothed fit curve with confidence region
+
+#data_FTEs<-data_all[c("data_all$X52.1b","data_all$X52.1c", "data_all$X52.2b", "data_all$X52.2c", "data_all$X52.3b", "data_all$X52.3c","data_all$X52.4b", "data_all$X52.4c","data_all$X52.5b", "data_all$X52.5c","data_all$X52.6b", "data_all$X52.6c", "data_all$X52.7a.b", "data_all$X52.7a.c", "data_all$X52.7b.b", "data_all$X52.7b.c"),]
+
+data_all$RNFTEs<-apply(na.omit(c(data_all$X52.1b,data_all$X52.1c, data_all$X52.2b, data_all$X52.2c, data_all$X52.3b, data_all$X52.3c,data_all$X52.4b, data_all$X52.4c,data_all$X52.5b, data_all$X52.5c,data_all$X52.6b, data_all$X52.6c, data_all$X52.7a.b, data_all$X52.7a.c, data_all$X52.7b.b, data_all$X52.7b.c,data_all$X52.8b, data_all$X52.8c, data_all$X52.9b, data_all$X52.9c, data_all$X52.10b, data_all$X52.10c, data_all$X52.11b, data_all$X52.11c, data_all$X52.12b, data_all$X52.12c, data_all$X52.13b, data_all$X52.3c, data_all$X52.14a.b, data_all$X52.14a.c)),1,sum)
+
+
+
+#Statistical Testing
+
+T <- as.table(rbind(c(10,18), c(30,38), c(12,29), c(11,10), c(7,18))) #
+dimnames(T) <- list(party = c("<1000","1000-1999", "2000-2999", "3000-3999", "4000+"), meetsratio = c("yes","no"))
+T<-t(T)
+Xsq <- chisq.test(T)
+fisher.test(T)
+
+#Test whether oxytocin compliance with AWHONN Standard is the same for all Annual Delivery Categories
+
+O <- as.table(rbind(c(16,12), c(29,39), c(9,32), c(5,16), c(2,23))) #
+dimnames(O) <- list(party = c("<1000","1000-1999", "2000-2999", "3000-3999", "4000+"), meetsratio = c("yes","no"))
+O<-t(O)
+Xsq <- chisq.test(O)
+fisher.test(O)
+
+#Test whether no pain management with AWHONN Standard is the same for all Annual Delivery Categories
+
+P <- as.table(rbind(c(15,13), c(29,39), c(15,26), c(8,13), c(3,22))) #
+dimnames(P) <- list(party = c("<1000","1000-1999", "2000-2999", "3000-3999", "4000+"), meetsratio = c("yes","no"))
+P<-t(P)
+Xsq <- chisq.test(P)
+fisher.test(P)
+
+#Test whether pp complications stable compliance with AWHONN Standard is the same for all Annual Delivery Categories
+
+ppcomp <- as.table(rbind(c(20,3), c(29,28), c(13,25), c(10,7), c(6,15))) #
+dimnames(ppcomp) <- list(party = c("<1000","1000-1999", "2000-2999", "3000-3999", "4000+"), meetsratio = c("yes","no"))
+ppcomp<-t(ppcomp)
+Xsq <- chisq.test(ppcomp)
+fisher.test(ppcomp)
+#Test whether after two hour recovery period compliance with AWHONN Standard is the same for all Annual Delivery Categories
+#excludes hospitals that did not respond or responded as not applicable
+
+two_hr <- as.table(rbind(c(21,2), c(34,25), c(14,25), c(6,14), c(6,17))) #
+dimnames(two_hr) <- list(party = c("<1000","1000-1999", "2000-2999", "3000-3999", "4000+"), meetsratio = c("yes","no"))
+two_hr<-t(two_hr)
+Xsq <- chisq.test(two_hr)
+fisher.test(two_hr)
+
+#step graph of hospitals meeting the guidelines
+
+ggplot(data_all, aes(x=sequence,y=X._met)) + geom_step()+xlab("collaborative members")+ylab("% of AWHONN Guidelines met")+ylim(0.0,1)+scale_x_continuous(breaks=c(0,25,50,75,100,125,150,175,200))+geom_vline(xintercept=c(46,92,138))
+
+
+
+
+#Random Forest Analysis
+#Get rid of the NAs function
+appendNAs <- function(dataset) {
+  append_these = data.frame( is.na(dataset[, names(dataset)] ) )
+  names(append_these) = paste(names(append_these), "NA", sep = "_")
+  append_these = colwise(identity, function(x) any(x))(append_these)
+  dataset = cbind(dataset, append_these)
+  dataset[is.na(dataset)] = -1000
+  return(dataset)
+}
+samp2 = appendNAs(data_all)
+f0 = function(x) {
+  if (nlevels(x)>32) {
+    return (unclass(x))
+  } else {
+    return (x)
+  }
+}
+samp2 = colwise(f0)(samp2)
+
+library(randomForest)
+m = randomForest(Number.met~., data=samp2, ntree=15,
+                 sampsize=179, nodesize=25, do.trace=T)
+#partialPlot(m, samp2, Enclosure)
+#partialPlot(m, samp2, ProductSize)
+varImpPlot(m)
